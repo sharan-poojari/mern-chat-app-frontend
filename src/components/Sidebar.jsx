@@ -1,16 +1,30 @@
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 
 const Sidebar = () => {
-  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
+  const {
+    getUsers,
+    users,
+    selectedUser,
+    setSelectedUser,
+    isUsersLoading,
+  } = useChatStore();
+
   const { onlineUsers } = useAuthStore();
 
   useEffect(() => {
     getUsers();
   }, [getUsers]);
 
-  if (isUsersLoading) return <div className="p-4">Loading...</div>;
+  if (isUsersLoading) {
+    return (
+      <aside className="h-full w-20 lg:w-72 border-r border-base-300 flex items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </aside>
+    );
+  }
 
   return (
     <aside className="h-full w-20 lg:w-72 border-r border-base-300 flex flex-col">
@@ -33,12 +47,15 @@ const Sidebar = () => {
                 alt={user.fullName}
                 className="size-12 object-cover rounded-full"
               />
+
               {onlineUsers.includes(user._id) && (
                 <span className="absolute bottom-0 right-0 size-3 bg-green-500 rounded-full ring-2 ring-white" />
               )}
             </div>
+
             <div className="hidden lg:block text-left min-w-0">
               <div className="font-medium truncate">{user.fullName}</div>
+
               <div className="text-sm text-zinc-400">
                 {onlineUsers.includes(user._id) ? "Online" : "Offline"}
               </div>

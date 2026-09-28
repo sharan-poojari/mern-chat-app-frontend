@@ -1,8 +1,14 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
 
 const SignUpPage = () => {
-  const [formData, setFormData] = useState({ fullName: "", email: "", password: "" });
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+  });
+
   const { signup } = useAuthStore();
 
   const handleSubmit = (e) => {
@@ -12,32 +18,73 @@ const SignUpPage = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-6">
-        <h1 className="text-2xl font-bold text-center">Create Account</h1>
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm space-y-4 p-6"
+      >
+        <h1 className="text-2xl font-bold text-center">
+          Create Account
+        </h1>
+
         <input
           type="text"
           placeholder="Full Name"
           className="input input-bordered w-full"
           value={formData.fullName}
-          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              fullName: e.target.value,
+            })
+          }
+          required
         />
+
         <input
           type="email"
           placeholder="Email"
           className="input input-bordered w-full"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              email: e.target.value,
+            })
+          }
+          required
         />
+
         <input
           type="password"
           placeholder="Password"
           className="input input-bordered w-full"
           value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              password: e.target.value,
+            })
+          }
+          minLength={6}
+          required
         />
-        <button type="submit" className="btn btn-primary w-full">
+
+        <button
+          type="submit"
+          className="btn btn-primary w-full"
+        >
           Sign Up
         </button>
+
+        <p className="text-center text-sm text-base-content/60">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="text-primary font-medium hover:underline"
+          >
+            Login
+          </Link>
+        </p>
       </form>
     </div>
   );
