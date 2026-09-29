@@ -7,7 +7,9 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   users: [],
   selectedUser: null,
-
+  unreadCount: 0,
+  hasMoreMessages: false,
+  isLoadingOlderMessages: false,
   isUsersLoading: false,
   isMessagesLoading: false,
   isTyping: false,
@@ -36,13 +38,19 @@ export const useChatStore = create((set, get) => ({
     set({
       isMessagesLoading: true,
       messages: [],
+      unreadCount: 0,
+      hasMoreMessages: false,
     });
 
     try {
-      const res = await axiosInstance.get(`/messages/${userId}`);
+      const res = await axiosInstance.get(
+        `/messages/${userId}?limit=100`
+      );
 
       set({
-        messages: res.data,
+        messages: res.data.messages,
+        unreadCount: res.data.unreadCount,
+        hasMoreMessages: res.data.hasMore,
       });
     } catch (error) {
       toast.error(
@@ -50,6 +58,118 @@ export const useChatStore = create((set, get) => ({
       );
     } finally {
       set({ isMessagesLoading: false });
+    }
+  },
+
+  loadOlderMessages: async () => {
+    const {
+      selectedUser,
+      messages,
+      hasMoreMessages,
+      isLoadingOlderMessages,
+    } = get();
+
+    if (
+      !selectedUser ||
+      !messages.length ||
+      !hasMoreMessages ||
+      isLoadingOlderMessages
+    ) {
+      return;
+    }
+
+    const oldestMessage = messages[0];
+
+    set({ isLoadingOlderMessages: true });
+
+    try {
+      const res = await axiosInstance.get(
+        `/messages/${selectedUser._id}?limit=100&before=${oldestMessage._id}`
+      );
+
+      set((state) => ({
+        messages: [...res.data.messages, ...state.messages],
+        hasMoreMessages: res.data.hasMore,
+      }));
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to load older messages"
+      );
+    } finally {
+      set({ isLoadingOlderMessages: false });
+    }
+  },
+
+  // Mark messages as read
+  markMessagesAsRead: async (userId) => {
+    if (!userId) return;
+
+    try {
+      await axiosInstance.put(`/messages/read/${userId}`);
+
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.senderId === userId
+            ? { ...message, status: "read" }
+            : message
+        ),
+
+        // New messages separator disappears after messages are read
+        unreadCount: 0,
+      }));
+    } catch (error) {
+      console.log(
+        "Error in markMessagesAsRead:",
+        error.response?.data?.message || error.message
+      );
+    }
+  },
+
+  editMessage: async (messageId, text) => {
+    try {
+      const res = await axiosInstance.put(
+        `/messages/edit/${messageId}`,
+        { text }
+      );
+
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message._id === messageId
+            ? { ...message, text: res.data.text }
+            : message
+        ),
+      }));
+
+      return true;
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to edit message"
+      );
+
+      return false;
+    }
+  },
+
+  deleteMessage: async (messageId) => {
+    try {
+      const res = await axiosInstance.delete(
+        `/messages/${messageId}`
+      );
+
+      set((state) => ({
+        messages: state.messages.filter(
+          (message) => message._id !== messageId
+        ),
+      }));
+
+      return res.data;
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to delete message"
+      );
+
+      return false;
     }
   },
 
@@ -87,7 +207,7 @@ export const useChatStore = create((set, get) => ({
 
     if (!socket) return;
 
-    socket.on("newMessage", (newMessage) => {
+    socket.on("newMessage", async (newMessage) => {
       const isMessageFromSelectedUser =
         newMessage.senderId === selectedUser._id;
 
@@ -95,6 +215,51 @@ export const useChatStore = create((set, get) => ({
 
       set((state) => ({
         messages: [...state.messages, newMessage],
+      }));
+
+      // Chat is currently open, so mark the new message as read
+      await get().markMessagesAsRead(newMessage.senderId);
+    });
+
+    // Message delivered status
+    socket.on("messageDelivered", ({ messageId }) => {
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message._id === messageId
+            ? { ...message, status: "delivered" }
+            : message
+        ),
+      }));
+    });
+
+    // Message Edit
+    socket.on("messageEdited", ({ messageId, text }) => {
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message._id === messageId
+            ? { ...message, text }
+            : message
+        ),
+      }));
+    });
+
+    // Message Delete
+    socket.on("messageDeleted", ({ messageId }) => {
+      set((state) => ({
+        messages: state.messages.filter(
+          (message) => message._id !== messageId
+        ),
+      }));
+    });
+
+    // Message read status
+    socket.on("messagesRead", ({ senderId }) => {
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.receiverId === senderId
+            ? { ...message, status: "read" }
+            : message
+        ),
       }));
     });
 
@@ -117,8 +282,12 @@ export const useChatStore = create((set, get) => ({
     if (!socket) return;
 
     socket.off("newMessage");
+    socket.off("messageDelivered");
+    socket.off("messagesRead");
+    socket.off("messageEdited");
     socket.off("userTyping");
     socket.off("userStoppedTyping");
+    socket.off("messageDeleted");
 
     set({ isTyping: false });
   },
@@ -128,6 +297,7 @@ export const useChatStore = create((set, get) => ({
       selectedUser,
       isTyping: false,
       messages: [],
+      unreadCount: 0,
     });
   },
 }));
