@@ -7,7 +7,11 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   users: [],
   selectedUser: null,
+
   unreadCount: 0,
+  newMessagesStartIndex: -1,
+  showNewMessagesSeparator: false,
+
   hasMoreMessages: false,
   isLoadingOlderMessages: false,
   isUsersLoading: false,
@@ -39,6 +43,8 @@ export const useChatStore = create((set, get) => ({
       isMessagesLoading: true,
       messages: [],
       unreadCount: 0,
+      newMessagesStartIndex: -1,
+      showNewMessagesSeparator: false,
       hasMoreMessages: false,
     });
 
@@ -47,9 +53,18 @@ export const useChatStore = create((set, get) => ({
         `/messages/${userId}?limit=100`
       );
 
+      const unreadCount = res.data.unreadCount || 0;
+
+      const newMessagesStartIndex =
+        unreadCount > 0
+          ? Math.max(0, res.data.messages.length - unreadCount)
+          : -1;
+
       set({
         messages: res.data.messages,
-        unreadCount: res.data.unreadCount,
+        unreadCount,
+        newMessagesStartIndex,
+        showNewMessagesSeparator: unreadCount > 0,
         hasMoreMessages: res.data.hasMore,
       });
     } catch (error) {
@@ -115,7 +130,7 @@ export const useChatStore = create((set, get) => ({
             : message
         ),
 
-        // New messages separator disappears after messages are read
+        // Read status is independent from the new messages separator.
         unreadCount: 0,
       }));
     } catch (error) {
@@ -124,6 +139,14 @@ export const useChatStore = create((set, get) => ({
         error.response?.data?.message || error.message
       );
     }
+  },
+
+  // Hide the "New messages" separator independently
+  clearNewMessagesSeparator: () => {
+    set({
+      showNewMessagesSeparator: false,
+      newMessagesStartIndex: -1,
+    });
   },
 
   editMessage: async (messageId, text) => {
@@ -217,7 +240,8 @@ export const useChatStore = create((set, get) => ({
         messages: [...state.messages, newMessage],
       }));
 
-      // Chat is currently open, so mark the new message as read
+      // Chat is already open, so the new message is
+      // immediately marked as read.
       await get().markMessagesAsRead(newMessage.senderId);
     });
 
@@ -298,6 +322,8 @@ export const useChatStore = create((set, get) => ({
       isTyping: false,
       messages: [],
       unreadCount: 0,
+      newMessagesStartIndex: -1,
+      showNewMessagesSeparator: false,
     });
   },
 }));

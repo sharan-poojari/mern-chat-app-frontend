@@ -19,47 +19,47 @@ const App = () => {
 
   if (isCheckingAuth && !authUser) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-base-100">
+        <div className="flex size-14 items-center justify-center rounded-full bg-base-200">
+          <Loader className="size-7 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="min-h-screen bg-base-100">
       <Navbar />
 
       <Routes>
         <Route
           path="/"
-          element={
-            authUser ? <HomePage /> : <Navigate to="/login" />
-          }
+          element={authUser ? <HomePage /> : <Navigate to="/login" />}
         />
 
         <Route
           path="/login"
-          element={
-            !authUser ? <LogInPage /> : <Navigate to="/" />
-          }
+          element={!authUser ? <LogInPage /> : <Navigate to="/" />}
         />
 
         <Route
           path="/signup"
-          element={
-            !authUser ? <SignUpPage /> : <Navigate to="/" />
-          }
+          element={!authUser ? <SignUpPage /> : <Navigate to="/" />}
         />
 
         <Route
           path="/profile"
-          element={
-            authUser ? <ProfilePage /> : <Navigate to="/login" />
-          }
+          element={authUser ? <ProfilePage /> : <Navigate to="/login" />}
         />
       </Routes>
 
-      <Toaster />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          className: "text-sm",
+        }}
+      />
     </div>
   );
 };

@@ -90,23 +90,30 @@ const MessageInput = () => {
     }
   };
 
+  const hasMessageContent = Boolean(
+    text.trim() || imagePreview
+  );
+
   return (
-    <div className="p-4 w-full border-t border-base-300">
+    <div className="w-full px-1 py-2 sm:px-0 sm:py-0">
+      {/* Image Preview */}
       {imagePreview && (
-        <div className="mb-3 flex items-center gap-2">
-          <div className="relative">
+        <div className="mb-3 px-1">
+          <div className="relative inline-block rounded-xl border border-base-300 bg-base-200 p-1.5 shadow-sm">
             <img
               src={imagePreview}
-              alt="Preview"
-              className="size-20 object-cover rounded-lg border border-base-300"
+              alt="Selected image preview"
+              className="size-20 rounded-lg object-cover sm:size-24"
             />
 
             <button
               type="button"
               onClick={removeImage}
-              className="absolute -top-2 -right-2 size-6 rounded-full bg-base-300 flex items-center justify-center hover:bg-base-content hover:text-base-100 transition-colors"
+              className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full border border-base-300 bg-base-100 text-base-content shadow-sm transition-all hover:scale-105 hover:bg-error hover:text-error-content"
+              title="Remove image"
+              aria-label="Remove selected image"
             >
-              <X className="size-4" />
+              <X className="size-3.5" />
             </button>
           </div>
         </div>
@@ -114,16 +121,23 @@ const MessageInput = () => {
 
       <form
         onSubmit={handleSendMessage}
-        className="flex items-center gap-2"
+        className="flex w-full items-center gap-1.5 sm:gap-2"
       >
+        {/* Message Input */}
         <input
           type="text"
-          className="w-full input input-bordered rounded-lg input-sm sm:input-md"
-          placeholder="Type a message..."
+          className="input input-bordered input-sm min-w-0 flex-1 rounded-full px-4 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:input-md"
+          placeholder={
+            imagePreview
+              ? "Add a message (optional)..."
+              : "Type a message..."
+          }
           value={text}
           onChange={handleTextChange}
+          maxLength={1000}
         />
 
+        {/* Hidden File Input */}
         <input
           type="file"
           accept="image/*"
@@ -132,22 +146,34 @@ const MessageInput = () => {
           onChange={handleImageChange}
         />
 
+        {/* Image Button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="btn btn-circle btn-sm"
+          className={`btn btn-circle btn-sm shrink-0 transition-all sm:btn-md ${
+            imagePreview
+              ? "btn-primary"
+              : "btn-ghost border border-base-300"
+          }`}
           title="Attach image"
+          aria-label="Attach image"
         >
-          <Image className="size-5" />
+          <Image className="size-4 sm:size-5" />
         </button>
 
+        {/* Send Button */}
         <button
           type="submit"
-          className="btn btn-circle btn-sm"
-          disabled={!text.trim() && !imagePreview}
+          className={`btn btn-circle btn-sm shrink-0 transition-all sm:btn-md ${
+            hasMessageContent
+              ? "btn-primary"
+              : "btn-ghost border border-base-300 opacity-50"
+          }`}
+          disabled={!hasMessageContent}
           title="Send message"
+          aria-label="Send message"
         >
-          <Send className="size-5" />
+          <Send className="size-4 sm:size-5" />
         </button>
       </form>
     </div>
