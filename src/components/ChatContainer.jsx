@@ -236,7 +236,7 @@ const ChatContainer = () => {
           {/* Avatar */}
           <div className="relative shrink-0">
             <img
-              src={selectedUser.profilePic || "/avatar.png"}
+              src={selectedUser.profilePic || "/avatar.svg"}
               alt={selectedUser.fullName}
               className="size-10 rounded-full object-cover ring-1 ring-base-300 sm:size-11"
             />

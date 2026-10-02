@@ -60,7 +60,7 @@ const Sidebar = ({ onSelectUser }) => {
               {/* Avatar */}
               <div className="relative shrink-0">
                 <img
-                  src={user.profilePic || "/avatar.png"}
+                  src={user.profilePic || "/avatar.svg"}
                   alt={user.fullName}
                   className={`size-10 rounded-full object-cover ring-1 transition-all sm:size-11 lg:size-12 ${isSelected
                       ? "ring-primary/40"
