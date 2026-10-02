@@ -4,12 +4,11 @@ import { Loader2, UsersRound } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 
-const Sidebar = () => {
+const Sidebar = ({ onSelectUser }) => {
   const {
     getUsers,
     users,
     selectedUser,
-    setSelectedUser,
     isUsersLoading,
   } = useChatStore();
 
@@ -52,53 +51,48 @@ const Sidebar = () => {
             <button
               key={user._id}
               type="button"
-              onClick={() => setSelectedUser(user)}
-              className={`group flex w-full items-center justify-center gap-3 border-l-2 px-2 py-2.5 transition-all sm:px-3 sm:py-3 lg:justify-start ${
-                isSelected
+              onClick={() => onSelectUser(user)}
+              className={`group flex w-full items-center justify-center gap-3 border-l-2 px-2 py-2.5 transition-all sm:px-3 sm:py-3 lg:justify-start ${isSelected
                   ? "border-primary bg-base-200"
                   : "border-transparent hover:bg-base-200"
-              }`}
+                }`}
             >
               {/* Avatar */}
               <div className="relative shrink-0">
                 <img
                   src={user.profilePic || "/avatar.png"}
                   alt={user.fullName}
-                  className={`size-10 rounded-full object-cover ring-1 transition-all sm:size-11 lg:size-12 ${
-                    isSelected
+                  className={`size-10 rounded-full object-cover ring-1 transition-all sm:size-11 lg:size-12 ${isSelected
                       ? "ring-primary/40"
                       : "ring-base-300 group-hover:ring-base-content/20"
-                  }`}
+                    }`}
                 />
 
                 {/* Online Indicator */}
                 <span
-                  className={`absolute bottom-0 right-0 rounded-full ring-2 ring-base-100 transition-all ${
-                    isOnline
+                  className={`absolute bottom-0 right-0 rounded-full ring-2 ring-base-100 transition-all ${isOnline
                       ? "size-2.5 bg-green-500 sm:size-3"
                       : "size-2.5 bg-zinc-400 opacity-0 sm:size-3 lg:opacity-40"
-                  }`}
+                    }`}
                 />
               </div>
 
               {/* User Details */}
               <div className="hidden min-w-0 flex-1 text-left lg:block">
                 <div
-                  className={`truncate text-sm ${
-                    isSelected
+                  className={`truncate text-sm ${isSelected
                       ? "font-semibold"
                       : "font-medium"
-                  }`}
+                    }`}
                 >
                   {user.fullName}
                 </div>
 
                 <div
-                  className={`mt-0.5 text-xs ${
-                    isOnline
+                  className={`mt-0.5 text-xs ${isOnline
                       ? "font-medium text-green-500"
                       : "text-zinc-400"
-                  }`}
+                    }`}
                 >
                   {isOnline ? "Online" : "Offline"}
                 </div>

@@ -1,6 +1,6 @@
 import axios from "axios";
 
 export const axiosInstance = axios.create({
-  baseURL: "http://localhost:5001/api",
-  withCredentials: true, // cookies (JWT) automatically bhejne ke liye
+  baseURL: import.meta.env.VITE_API_URL,
+  withCredentials: true,
 });
