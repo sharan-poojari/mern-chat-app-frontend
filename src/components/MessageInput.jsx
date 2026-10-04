@@ -14,7 +14,14 @@ const MessageInput = () => {
   const { sendMessage, selectedUser } = useChatStore();
   const { socket } = useAuthStore();
 
+  const isChatBlocked = Boolean(selectedUser?.isBlocked);
+
   const handleImageChange = (e) => {
+    if (isChatBlocked) {
+      toast.error("You cannot send messages to a blocked user");
+      return;
+    }
+
     const file = e.target.files[0];
 
     if (!file) return;
@@ -47,6 +54,8 @@ const MessageInput = () => {
   };
 
   const handleTextChange = (e) => {
+    if (isChatBlocked) return;
+
     const value = e.target.value;
 
     setText(value);
@@ -66,6 +75,11 @@ const MessageInput = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
+
+    if (isChatBlocked) {
+      toast.error("You cannot send messages to a blocked user");
+      return;
+    }
 
     if (!text.trim() && !imagePreview) return;
 
@@ -87,17 +101,16 @@ const MessageInput = () => {
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
   };
 
-  const hasMessageContent = Boolean(
-    text.trim() || imagePreview
-  );
+  const hasMessageContent = Boolean(text.trim() || imagePreview);
 
   return (
     <div className="w-full px-1 py-2 sm:px-0 sm:py-0">
       {/* Image Preview */}
-      {imagePreview && (
+      {imagePreview && !isChatBlocked && (
         <div className="mb-3 px-1">
           <div className="relative inline-block rounded-xl border border-base-300 bg-base-200 p-1.5 shadow-sm">
             <img
@@ -128,13 +141,16 @@ const MessageInput = () => {
           type="text"
           className="input input-bordered input-sm min-w-0 flex-1 rounded-full px-4 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:input-md"
           placeholder={
-            imagePreview
-              ? "Add a message (optional)..."
-              : "Type a message..."
+            isChatBlocked
+              ? "Chat is blocked"
+              : imagePreview
+                ? "Add a message (optional)..."
+                : "Type a message..."
           }
           value={text}
           onChange={handleTextChange}
           maxLength={1000}
+          disabled={isChatBlocked}
         />
 
         {/* Hidden File Input */}
@@ -144,19 +160,30 @@ const MessageInput = () => {
           className="hidden"
           ref={fileInputRef}
           onChange={handleImageChange}
+          disabled={isChatBlocked}
         />
 
         {/* Image Button */}
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            if (isChatBlocked) {
+              toast.error("You cannot send messages to a blocked user");
+              return;
+            }
+
+            fileInputRef.current?.click();
+          }}
           className={`btn btn-circle btn-sm shrink-0 transition-all sm:btn-md ${
-            imagePreview
-              ? "btn-primary"
-              : "btn-ghost border border-base-300"
+            isChatBlocked
+              ? "btn-ghost border border-base-300 opacity-40"
+              : imagePreview
+                ? "btn-primary"
+                : "btn-ghost border border-base-300"
           }`}
-          title="Attach image"
-          aria-label="Attach image"
+          title={isChatBlocked ? "Chat is blocked" : "Attach image"}
+          aria-label={isChatBlocked ? "Chat is blocked" : "Attach image"}
+          disabled={isChatBlocked}
         >
           <Image className="size-4 sm:size-5" />
         </button>
@@ -165,13 +192,15 @@ const MessageInput = () => {
         <button
           type="submit"
           className={`btn btn-circle btn-sm shrink-0 transition-all sm:btn-md ${
-            hasMessageContent
-              ? "btn-primary"
-              : "btn-ghost border border-base-300 opacity-50"
+            isChatBlocked
+              ? "btn-ghost border border-base-300 opacity-40"
+              : hasMessageContent
+                ? "btn-primary"
+                : "btn-ghost border border-base-300 opacity-50"
           }`}
-          disabled={!hasMessageContent}
-          title="Send message"
-          aria-label="Send message"
+          disabled={isChatBlocked || !hasMessageContent}
+          title={isChatBlocked ? "Chat is blocked" : "Send message"}
+          aria-label={isChatBlocked ? "Chat is blocked" : "Send message"}
         >
           <Send className="size-4 sm:size-5" />
         </button>

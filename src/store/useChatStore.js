@@ -18,14 +18,47 @@ export const useChatStore = create((set, get) => ({
   isMessagesLoading: false,
   isTyping: false,
 
+  // ---------------------------------------------------------
+  // Fetch contacts/users and synchronize selected contact
+  // ---------------------------------------------------------
   getUsers: async () => {
     set({ isUsersLoading: true });
 
     try {
       const res = await axiosInstance.get("/messages/users");
+      const users = res.data;
 
-      set({
-        users: res.data,
+      set((state) => {
+        const selectedUser = state.selectedUser;
+
+        if (!selectedUser) {
+          return { users };
+        }
+
+        const updatedSelectedUser = users.find(
+          (user) => user._id === selectedUser._id
+        );
+
+        if (!updatedSelectedUser) {
+          return {
+            users,
+            selectedUser: null,
+            messages: [],
+            unreadCount: 0,
+            newMessagesStartIndex: -1,
+            showNewMessagesSeparator: false,
+            hasMoreMessages: false,
+            isTyping: false,
+          };
+        }
+
+        return {
+          users,
+          selectedUser: updatedSelectedUser,
+          isTyping: updatedSelectedUser.isBlocked
+            ? false
+            : state.isTyping,
+        };
       });
     } catch (error) {
       toast.error(
@@ -36,6 +69,9 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
+  // Fetch messages for selected contact
+  // ---------------------------------------------------------
   getMessages: async (userId) => {
     if (!userId) return;
 
@@ -76,6 +112,9 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
+  // Load older messages
+  // ---------------------------------------------------------
   loadOlderMessages: async () => {
     const {
       selectedUser,
@@ -86,6 +125,7 @@ export const useChatStore = create((set, get) => ({
 
     if (
       !selectedUser ||
+      selectedUser.isBlocked ||
       !messages.length ||
       !hasMoreMessages ||
       isLoadingOlderMessages
@@ -116,9 +156,21 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
   // Mark messages as read
+  // ---------------------------------------------------------
   markMessagesAsRead: async (userId) => {
     if (!userId) return;
+
+    const { selectedUser } = get();
+
+    if (
+      !selectedUser ||
+      selectedUser._id !== userId ||
+      selectedUser.isBlocked
+    ) {
+      return;
+    }
 
     try {
       await axiosInstance.put(`/messages/read/${userId}`);
@@ -129,8 +181,6 @@ export const useChatStore = create((set, get) => ({
             ? { ...message, status: "read" }
             : message
         ),
-
-        // Read status is independent from the new messages separator.
         unreadCount: 0,
       }));
     } catch (error) {
@@ -141,7 +191,9 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Hide the "New messages" separator independently
+  // ---------------------------------------------------------
+  // Hide new messages separator
+  // ---------------------------------------------------------
   clearNewMessagesSeparator: () => {
     set({
       showNewMessagesSeparator: false,
@@ -149,7 +201,17 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  // ---------------------------------------------------------
+  // Edit a message
+  // ---------------------------------------------------------
   editMessage: async (messageId, text) => {
+    const { selectedUser } = get();
+
+    if (!selectedUser || selectedUser.isBlocked) {
+      toast.error("Messaging is disabled for this contact");
+      return false;
+    }
+
     try {
       const res = await axiosInstance.put(
         `/messages/edit/${messageId}`,
@@ -174,7 +236,17 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
+  // Delete a message
+  // ---------------------------------------------------------
   deleteMessage: async (messageId) => {
+    const { selectedUser } = get();
+
+    if (!selectedUser || selectedUser.isBlocked) {
+      toast.error("Messaging is disabled for this contact");
+      return false;
+    }
+
     try {
       const res = await axiosInstance.delete(
         `/messages/${messageId}`
@@ -196,10 +268,16 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
+  // Send a message
+  // ---------------------------------------------------------
   sendMessage: async (messageData) => {
     const { selectedUser } = get();
 
-    if (!selectedUser) return false;
+    if (!selectedUser || selectedUser.isBlocked) {
+      toast.error("Messaging is disabled for this contact");
+      return false;
+    }
 
     try {
       const res = await axiosInstance.post(
@@ -221,6 +299,9 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ---------------------------------------------------------
+  // Subscribe to real-time messages and events
+  // ---------------------------------------------------------
   subscribeToMessages: () => {
     const { selectedUser } = get();
 
@@ -230,7 +311,18 @@ export const useChatStore = create((set, get) => ({
 
     if (!socket) return;
 
+    // New message
     socket.on("newMessage", async (newMessage) => {
+      const currentSelectedUser = get().selectedUser;
+
+      if (
+        !currentSelectedUser ||
+        currentSelectedUser._id !== selectedUser._id ||
+        currentSelectedUser.isBlocked
+      ) {
+        return;
+      }
+
       const isMessageFromSelectedUser =
         newMessage.senderId === selectedUser._id;
 
@@ -240,8 +332,6 @@ export const useChatStore = create((set, get) => ({
         messages: [...state.messages, newMessage],
       }));
 
-      // Chat is already open, so the new message is
-      // immediately marked as read.
       await get().markMessagesAsRead(newMessage.senderId);
     });
 
@@ -256,7 +346,7 @@ export const useChatStore = create((set, get) => ({
       }));
     });
 
-    // Message Edit
+    // Message edit
     socket.on("messageEdited", ({ messageId, text }) => {
       set((state) => ({
         messages: state.messages.map((message) =>
@@ -267,7 +357,7 @@ export const useChatStore = create((set, get) => ({
       }));
     });
 
-    // Message Delete
+    // Message delete
     socket.on("messageDeleted", ({ messageId }) => {
       set((state) => ({
         messages: state.messages.filter(
@@ -287,12 +377,20 @@ export const useChatStore = create((set, get) => ({
       }));
     });
 
+    // Typing indicator
     socket.on("userTyping", (userId) => {
-      if (userId === selectedUser._id) {
+      const currentSelectedUser = get().selectedUser;
+
+      if (
+        currentSelectedUser?._id === selectedUser._id &&
+        userId === selectedUser._id &&
+        !currentSelectedUser.isBlocked
+      ) {
         set({ isTyping: true });
       }
     });
 
+    // Stop typing
     socket.on("userStoppedTyping", (userId) => {
       if (userId === selectedUser._id) {
         set({ isTyping: false });
@@ -300,6 +398,9 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  // ---------------------------------------------------------
+  // Unsubscribe from real-time events
+  // ---------------------------------------------------------
   unsubscribeFromMessages: () => {
     const socket = useAuthStore.getState().socket;
 
@@ -316,14 +417,19 @@ export const useChatStore = create((set, get) => ({
     set({ isTyping: false });
   },
 
+  // ---------------------------------------------------------
+  // Select a contact and reset chat state
+  // ---------------------------------------------------------
   setSelectedUser: (selectedUser) => {
     set({
       selectedUser,
-      isTyping: false,
       messages: [],
       unreadCount: 0,
       newMessagesStartIndex: -1,
       showNewMessagesSeparator: false,
+      hasMoreMessages: false,
+      isTyping: false,
+      isLoadingOlderMessages: false,
     });
   },
 }));

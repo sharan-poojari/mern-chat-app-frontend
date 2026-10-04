@@ -19,7 +19,7 @@ export const useAuthStore = create((set, get) => ({
       set({ authUser: res.data });
 
       get().connectSocket();
-    } catch  {
+    } catch {
       set({ authUser: null });
     } finally {
       set({ isCheckingAuth: false });
@@ -28,7 +28,10 @@ export const useAuthStore = create((set, get) => ({
 
   signup: async (data) => {
     try {
-      const res = await axiosInstance.post("/auth/signup", data);
+      const res = await axiosInstance.post(
+        "/auth/signup",
+        data
+      );
 
       set({ authUser: res.data });
 
@@ -44,7 +47,10 @@ export const useAuthStore = create((set, get) => ({
 
   login: async (data) => {
     try {
-      const res = await axiosInstance.post("/auth/login", data);
+      const res = await axiosInstance.post(
+        "/auth/login",
+        data
+      );
 
       set({ authUser: res.data });
 
@@ -78,25 +84,86 @@ export const useAuthStore = create((set, get) => ({
   },
 
   connectSocket: () => {
-    const { authUser } = get();
+    const { authUser, socket } = get();
 
-    if (!authUser || get().socket?.connected) return;
+    if (!authUser || socket?.connected) {
+      return;
+    }
 
-    const socket = io(BASE_URL, {
+    const newSocket = io(BASE_URL, {
       withCredentials: true,
     });
 
-    set({ socket });
+    set({ socket: newSocket });
 
-    socket.on("getOnlineUsers", (userIds) => {
-      set({ onlineUsers: userIds });
+    // Socket connected
+    newSocket.on("connect", () => {
+      console.log(
+        "Socket connected:",
+        newSocket.id
+      );
+    });
+
+    // Online users
+    newSocket.on("getOnlineUsers", (userIds) => {
+      set({
+        onlineUsers: userIds,
+      });
+    });
+
+    // Connection accepted
+    newSocket.on(
+      "connectionAccepted",
+      async (data) => {
+        console.log(
+          "Connection accepted event received:",
+          data
+        );
+
+        try {
+          const { useChatStore } = await import(
+            "./useChatStore.js"
+          );
+
+          await useChatStore
+            .getState()
+            .getUsers();
+
+          console.log(
+            "Contacts refreshed after connection accepted"
+          );
+
+          toast.success("New contact added");
+        } catch (error) {
+          console.log(
+            "Error refreshing contacts:",
+            error.message
+          );
+        }
+      }
+    );
+
+    // Socket connection error
+    newSocket.on("connect_error", (error) => {
+      console.log(
+        "Socket connection error:",
+        error.message
+      );
+    });
+
+    // Socket disconnected
+    newSocket.on("disconnect", (reason) => {
+      console.log(
+        "Socket disconnected:",
+        reason
+      );
     });
   },
 
   disconnectSocket: () => {
     const socket = get().socket;
 
-    if (socket?.connected) {
+    if (socket) {
       socket.disconnect();
     }
 
@@ -119,10 +186,14 @@ export const useAuthStore = create((set, get) => ({
 
       toast.success("Profile updated successfully");
     } catch (error) {
-      console.log("Error in update profile:", error);
+      console.log(
+        "Error in update profile:",
+        error
+      );
 
       toast.error(
-        error.response?.data?.message || "Profile update failed"
+        error.response?.data?.message ||
+          "Profile update failed"
       );
     } finally {
       set({ isUpdatingProfile: false });

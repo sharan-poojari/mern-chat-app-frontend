@@ -8,9 +8,12 @@ import {
   Circle,
   MessageCircle,
   Maximize2,
+  ShieldBan,
+  ShieldCheck,
 } from "lucide-react";
 
 import { useChatStore } from "../store/useChatStore";
+import { useConnectionStore } from "../store/useConnectionStore";
 import { useAuthStore } from "../store/useAuthStore";
 import MessageInput from "./MessageInput";
 
@@ -33,6 +36,12 @@ const ChatContainer = () => {
     isTyping,
     isMessagesLoading,
   } = useChatStore();
+
+  const {
+    blockUser,
+    unblockUser,
+    isUpdatingConnection,
+  } = useConnectionStore();
 
   const { authUser, onlineUsers } = useAuthStore();
 
@@ -62,12 +71,14 @@ const ChatContainer = () => {
   // Mark messages as read after messages are loaded
   useEffect(() => {
     if (!selectedUser?._id) return;
+    if (selectedUser.isBlocked) return;
     if (isMessagesLoading) return;
     if (!messages.length) return;
 
     markMessagesAsRead(selectedUser._id);
   }, [
     selectedUser?._id,
+    selectedUser?.isBlocked,
     isMessagesLoading,
     messages.length,
     markMessagesAsRead,
@@ -113,6 +124,7 @@ const ChatContainer = () => {
     };
   }, [selectedImage]);
 
+  // Auto-scroll for new messages
   useEffect(() => {
     const container = messagesContainerRef.current;
 
@@ -140,6 +152,8 @@ const ChatContainer = () => {
   }, [messages]);
 
   const handleEditStart = (message) => {
+    if (selectedUser?.isBlocked) return;
+
     setEditingMessageId(message._id);
     setEditingText(message.text || "");
   };
@@ -150,6 +164,8 @@ const ChatContainer = () => {
   };
 
   const handleEditSave = async (messageId) => {
+    if (selectedUser?.isBlocked) return;
+
     const trimmedText = editingText.trim();
 
     if (!trimmedText) return;
@@ -163,6 +179,8 @@ const ChatContainer = () => {
   };
 
   const handleDelete = async (messageId) => {
+    if (selectedUser?.isBlocked) return;
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this message?"
     );
@@ -170,6 +188,28 @@ const ChatContainer = () => {
     if (!confirmed) return;
 
     await deleteMessage(messageId);
+  };
+
+  // Block user through Connection Store
+  const handleBlockUser = async () => {
+    if (!selectedUser?._id || isUpdatingConnection) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to block ${selectedUser.fullName}? You will not be able to send or receive messages from them until you unblock them.`
+    );
+
+    if (!confirmed) return;
+
+    handleEditCancel();
+
+    await blockUser(selectedUser._id);
+  };
+
+  // Unblock user through Connection Store
+  const handleUnblockUser = async () => {
+    if (!selectedUser?._id || isUpdatingConnection) return;
+
+    await unblockUser(selectedUser._id);
   };
 
   const formatMessageTime = (createdAt) => {
@@ -182,6 +222,8 @@ const ChatContainer = () => {
   };
 
   const handleLoadOlderMessages = async () => {
+    if (selectedUser?.isBlocked) return;
+
     const container = messagesContainerRef.current;
 
     if (!container) return;
@@ -207,7 +249,7 @@ const ChatContainer = () => {
     selectedUser?._id
   );
 
-  // Empty state when no conversation is selected
+  // Empty state
   if (!selectedUser) {
     return (
       <div className="flex h-full min-h-0 flex-1 items-center justify-center bg-base-100 px-6">
@@ -228,6 +270,8 @@ const ChatContainer = () => {
     );
   }
 
+  const isChatBlocked = Boolean(selectedUser.isBlocked);
+
   return (
     <>
       <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-base-100">
@@ -243,9 +287,11 @@ const ChatContainer = () => {
 
             <span
               className={`absolute bottom-0 right-0 size-3 rounded-full ring-2 ring-base-100 transition-colors ${
-                isSelectedUserOnline
-                  ? "bg-green-500"
-                  : "bg-zinc-400"
+                isChatBlocked
+                  ? "bg-error"
+                  : isSelectedUserOnline
+                    ? "bg-green-500"
+                    : "bg-zinc-400"
               }`}
             />
           </div>
@@ -259,23 +305,68 @@ const ChatContainer = () => {
             <div className="mt-0.5 flex items-center gap-1.5">
               <Circle
                 className={`size-2 fill-current ${
-                  isSelectedUserOnline
-                    ? "text-green-500"
-                    : "text-zinc-400"
+                  isChatBlocked
+                    ? "text-error"
+                    : isSelectedUserOnline
+                      ? "text-green-500"
+                      : "text-zinc-400"
                 }`}
               />
 
               <p
                 className={`text-xs font-medium sm:text-sm ${
-                  isSelectedUserOnline
-                    ? "text-green-500"
-                    : "text-zinc-400"
+                  isChatBlocked
+                    ? "text-error"
+                    : isSelectedUserOnline
+                      ? "text-green-500"
+                      : "text-zinc-400"
                 }`}
               >
-                {isSelectedUserOnline ? "Online" : "Offline"}
+                {isChatBlocked
+                  ? "Blocked"
+                  : isSelectedUserOnline
+                    ? "Online"
+                    : "Offline"}
               </p>
             </div>
           </div>
+
+          {/* Block / Unblock */}
+          <button
+            type="button"
+            onClick={
+              isChatBlocked
+                ? handleUnblockUser
+                : handleBlockUser
+            }
+            disabled={isUpdatingConnection}
+            className={`btn btn-sm gap-1.5 ${
+              isChatBlocked
+                ? "btn-success btn-outline"
+                : "btn-error btn-outline"
+            }`}
+            title={
+              isChatBlocked
+                ? "Unblock user"
+                : "Block user"
+            }
+          >
+            {isUpdatingConnection ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isChatBlocked ? (
+              <ShieldCheck className="size-4" />
+            ) : (
+              <ShieldBan className="size-4" />
+            )}
+
+            <span className="hidden sm:inline">
+              {isUpdatingConnection
+                ? "Updating..."
+                : isChatBlocked
+                  ? "Unblock"
+                  : "Block"}
+            </span>
+          </button>
         </div>
 
         {/* Messages */}
@@ -300,16 +391,20 @@ const ChatContainer = () => {
               </div>
 
               <h3 className="mt-4 text-base font-semibold sm:text-lg">
-                No messages yet
+                {isChatBlocked
+                  ? "User blocked"
+                  : "No messages yet"}
               </h3>
 
               <p className="mt-1.5 max-w-xs text-sm leading-6 text-zinc-400">
-                Start a conversation with {selectedUser.fullName}.
+                {isChatBlocked
+                  ? `You blocked ${selectedUser.fullName}. Unblock them to resume chatting.`
+                  : `Start a conversation with ${selectedUser.fullName}.`}
               </p>
             </div>
           ) : (
             <>
-              {hasMoreMessages && (
+              {hasMoreMessages && !isChatBlocked && (
                 <div className="mb-5 flex justify-center">
                   <button
                     type="button"
@@ -443,7 +538,7 @@ const ChatContainer = () => {
                                   </p>
                                 )}
 
-                                {isOwnMessage && (
+                                {isOwnMessage && !isChatBlocked && (
                                   <div
                                     className={`flex items-center justify-end gap-2 ${
                                       message.text || message.image
@@ -515,7 +610,7 @@ const ChatContainer = () => {
                 })}
 
                 {/* Typing Indicator */}
-                {isTyping && (
+                {isTyping && !isChatBlocked && (
                   <div className="flex justify-start">
                     <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-base-300 px-4 py-2.5 shadow-sm">
                       <div className="flex items-center gap-1">
@@ -539,7 +634,18 @@ const ChatContainer = () => {
 
         {/* Message Input */}
         <div className="shrink-0 border-t border-base-300 bg-base-100 p-3 sm:p-4">
-          <MessageInput />
+          {isChatBlocked ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-base-200 px-4 py-3 text-center text-sm text-zinc-400">
+              <ShieldBan className="size-4 shrink-0" />
+
+              <span>
+                You blocked {selectedUser.fullName}. Unblock them to resume
+                chatting.
+              </span>
+            </div>
+          ) : (
+            <MessageInput />
+          )}
         </div>
       </div>
 

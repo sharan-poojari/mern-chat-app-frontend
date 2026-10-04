@@ -7,7 +7,13 @@ import ChatContainer from "../components/ChatContainer";
 import NoChatSelected from "../components/NoChatSelected";
 
 const HomePage = () => {
-  const { users, selectedUser, setSelectedUser, getUsers } = useChatStore();
+  const {
+    users,
+    selectedUser,
+    setSelectedUser,
+    getUsers,
+  } = useChatStore();
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -16,31 +22,62 @@ const HomePage = () => {
     }
   }, [users.length, getUsers]);
 
+  // Restore selected chat after refresh
   useEffect(() => {
     const chatUserId = searchParams.get("chat");
 
     if (!chatUserId || !users.length) return;
 
-    const user = users.find((user) => user._id === chatUserId);
+    const user = users.find(
+      (user) => user._id === chatUserId
+    );
 
     if (user) {
       setSelectedUser(user);
+    } else {
+      // User is no longer an accepted contact
+      setSelectedUser(null);
+      setSearchParams({});
     }
-  }, [searchParams, users, setSelectedUser]);
+  }, [
+    searchParams,
+    users,
+    setSelectedUser,
+    setSearchParams,
+  ]);
 
   const handleSelectUser = (user) => {
     setSelectedUser(user);
-    setSearchParams({ chat: user._id });
+    setSearchParams({
+      chat: user._id,
+    });
+  };
+
+  // Called when current contact is removed or blocked
+  const handleContactRemoved = (userId) => {
+    if (selectedUser?._id !== userId) {
+      return;
+    }
+
+    setSelectedUser(null);
+    setSearchParams({});
   };
 
   return (
     <div className="h-screen bg-base-200">
-      <div className="flex items-center justify-center pt-20 px-4">
-        <div className="bg-base-100 rounded-lg shadow-lg w-full max-w-6xl h-[calc(100vh-8rem)]">
-          <div className="flex h-full rounded-lg overflow-hidden">
-            <Sidebar onSelectUser={handleSelectUser} />
+      <div className="flex items-center justify-center px-4 pt-20">
+        <div className="h-[calc(100vh-8rem)] w-full max-w-6xl rounded-lg bg-base-100 shadow-lg">
+          <div className="flex h-full overflow-hidden rounded-lg">
+            <Sidebar
+              onSelectUser={handleSelectUser}
+              onContactRemoved={handleContactRemoved}
+            />
 
-            {!selectedUser ? <NoChatSelected /> : <ChatContainer />}
+            {!selectedUser ? (
+              <NoChatSelected />
+            ) : (
+              <ChatContainer />
+            )}
           </div>
         </div>
       </div>
